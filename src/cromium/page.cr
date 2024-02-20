@@ -179,7 +179,6 @@ class Cromium::Page
 
   private def handle_message(message : String)
     data = JSON.parse(message)
-    puts data
     if data["id"]?
       @requested_callbacks_mutex.synchronize do
         callback = @callback_channel[data["id"].as_i]?
