@@ -1,0 +1,9 @@
+name: cromium
+version: 0.1.0
+
+authors:
+  - Håkan <hakan@dun.se>
+
+crystal: 1.5.0
+
+license: MIT
