@@ -4,7 +4,16 @@ An simple CDP (Chrome Devtools Protocol) client, made for testing, scraping, scr
 
 ## Installation
 
-1. Add the dependency to your `shard.yml`:
+1. Install chromium, on ubuntu:
+   ```
+   sudo apt-get install chromium-browser
+   ```
+   or on mac:
+   ```
+   brew install chromium
+   ```
+
+2. Add the dependency to your `shard.yml`:
 
    ```yaml
    dependencies:
@@ -12,7 +21,7 @@ An simple CDP (Chrome Devtools Protocol) client, made for testing, scraping, scr
        github: confact/cromium
    ```
 
-2. Run `shards install`
+3. Run `shards install`
 
 ## Usage
 

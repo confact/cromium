@@ -3,7 +3,7 @@ class Cromium::Process
 
   def initialize
     endpoint_url = URI.parse(Cromium.endpoint)
-    @process = ::Process.new("/opt/apps/org.chromium.www/files/chrome", ["--headless", "--disable-gpu", "--remote-debugging-port=#{endpoint_url.port}"])
+    @process = ::Process.new("chromium", ["--headless", "--disable-gpu", "--remote-debugging-port=#{endpoint_url.port}"])
   end
 
   def self.start : self
@@ -20,7 +20,6 @@ class Cromium::Process
     if @process
       @process.try(&.signal(Signal::TERM))
       puts "Chromium process with PID #{@process.not_nil!.pid} stopped"
-      
       @process = nil
     else
       puts "No Chromium process running"
