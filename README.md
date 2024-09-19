@@ -86,7 +86,7 @@ Cromium.endpoint = "http://localhost:9000"
   
   returns the html of the page
 
-* .set_content(string) * Not fully working yet *
+* .set_content(string)
   
   sets the content of the page
 
@@ -105,7 +105,7 @@ page.wait_to_page_load do
   page.screenshot_to_file "google.png", full_page: true, hide_scrollbars: true
   page.pdf_to_file "google.pdf", print_background: true
 end
-browser.close
+browser.close # do not need to call it though, it will close when code exits
 
 ```
 
