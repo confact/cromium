@@ -8,6 +8,7 @@ class Cromium::Page
   property done_callback_channel : Channel(Int32)
   property callback_channel : Hash(Int32, Channel(JSON::Any)) = Hash(Int32, Channel(JSON::Any)).new
   property requested_callbacks_mutex : Mutex = Mutex.new
+  property active_requests : Int32 = 0
   property ws : HTTP::WebSocket
 
   enum NAVIGATE_TYPE
@@ -60,10 +61,16 @@ class Cromium::Page
     @ws.send(message)
     data = @callback_channel[@requested_callbacks].receive
     @callback_channel.delete(@requested_callbacks)
+
+    if data["error"]?
+      raise "CDP Error: #{data["error"]["message"]}"
+    end
+
     data
   end
 
   def goto(url : String)
+    @navigate_type = NAVIGATE_TYPE::NAVIGATE
     send_command("Page.navigate", url: url)
   end
 
@@ -119,8 +126,8 @@ class Cromium::Page
   end
 
   def set_content(content : String, wait_for : String = "networkIdle0")
-    puts "Setting content"
-    send_command("Page.setDocumentContent", frameId: frame.id, html: content)
+    script = "document.open(); document.write(#{content.to_json}); document.close();"
+    send_command("Runtime.evaluate", expression: script)
     @navigate_type = NAVIGATE_TYPE::SET_CONTENT
   end
 
@@ -146,15 +153,20 @@ class Cromium::Page
     end
   end
 
-  def wait_to_page_load
-    return if @navigate_type == NAVIGATE_TYPE::SET_CONTENT
+  def wait_for_page_load
     send_command("Page.enable")
+    send_command("Network.enable")
     puts "Waiting for page to load..."
-    @done_callback_channel.receive # wait for frameStoppedLoading
+
+    if @navigate_type == NAVIGATE_TYPE::SET_CONTENT
+      wait_for_network_idle_and_page_load
+    else
+      wait_for_page_load_event
+    end
   end
 
-  def wait_to_page_load(&block)
-    wait_to_page_load
+  def wait_for_page_load(&block)
+    wait_for_page_load
     block.call
   end
 
@@ -165,6 +177,32 @@ class Cromium::Page
   def wait_for_function(function : String) : JSON::Any
     data = send_command("Runtime.evaluate", expression: function)
     data["result"]["result"]
+  end
+
+  private def wait_for_page_load_event
+    puts "Waiting for page load event..."
+    @done_callback_channel.receive # Wait for Page.loadEventFired
+    puts "Page load event detected."
+  end
+
+  private def wait_for_network_idle_and_page_load
+    spawn do
+      loop do
+        # Wait for page load to complete and for network requests to finish
+        if @active_requests == 0
+          # Wait for an additional 500ms to ensure no new requests come in
+          sleep 0.5
+          if @active_requests == 0
+            puts "Network idle detected."
+            @done_callback_channel.send(0)
+            break
+          end
+        end
+        sleep 0.1
+      end
+    end
+
+    wait_for_page_load_event
   end
 
   private def on_event(event : String, block : (JSON::Any) -> Nil)
@@ -188,10 +226,13 @@ class Cromium::Page
         callback.send(data)
       end
     elsif data["method"]?
-      if data["method"] == "Page.frameStoppedLoading"
-        @requested_callbacks_mutex.synchronize do
-          @done_callback_channel.send(0)
-        end
+      # Handle network events
+      if data["method"] == "Network.requestWillBeSent"
+        @active_requests += 1
+      elsif data["method"] == "Network.loadingFinished" || data["method"] == "Network.loadingFailed"
+        @active_requests -= 1
+      elsif data["method"] == "Page.loadEventFired"
+        @done_callback_channel.send(0)
       end
     end
   end
